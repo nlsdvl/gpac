@@ -568,13 +568,27 @@ function get_mediaserver_stats(){
 	do_log(GF_LOG_INFO, `all_services: ${all_services}`);
 	const stats = all_services.reduce((r,s) => {
 		do_log(GF_LOG_INFO, `${s}`);
+		const [mabr_cache_type, http_cache_type, mod_cache_type] = s.mem_cache.reduce((r,f) => {
+			if (f.cache_type == CACHE_TYPE_MABR){
+				r[0]++;
+			} else if(s.cache_type == CACHE_TYPE_HTTP) {
+				r[1]++;
+			} else if(s.cache_type == CACHE_TYPE_MOD) {
+				r[2]++;
+			}
+			return r;
+		}, [0, 0, 0]);
 		r[s.id] = {
 			"stats": s.stats,
 			"pending_reqs": s.pending_reqs.length,
 			"mabr_loaded": s.mabr_loaded,
 			"nb_mabr_active": s.nb_mabr_active,
 			"last_mabr_active": s.last_mabr_active,
-			"dyn_mabr": s.dyn_mabr
+			"dyn_mabr": s.dyn_mabr,
+			"mem_cache": s.mem_cache.length,
+			"mem_cache_type_mabr": mabr_cache_type,
+			"mem_cache_type_http": http_cache_type,
+			"mem_cache_type_mod": mod_cache_type
 		};
 		return r;
 	}, {});
@@ -1824,6 +1838,7 @@ function create_service(http_url, force_mcast_activate, forced_sdesc)
 			serv_cfg.js_mod.service_activation(true);
 		}
 	};
+	
 	s.unload_mabr = function() {
 		if (this.source) {
 			do_log(GF_LOG_INFO, `Service ${this.id} stopping MABR`);
