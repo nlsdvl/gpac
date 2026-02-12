@@ -351,7 +351,7 @@ function update_manifest(manifest_ab, target_url, mabr_service, cache_file)
 			cache_file.manifest_min_update = mani.min_update;
 		}
 
-		do_log(GF_LOG_DEBUG, `Service ${service.id} updated HLS manifest`); // + JSON.stringify(service.manifest));
+		do_log(GF_LOG_INFO, `Service ${service.id} updated HLS manifest`); // + JSON.stringify(service.manifest));
 		return;
 	}
 
@@ -411,7 +411,7 @@ function update_manifest(manifest_ab, target_url, mabr_service, cache_file)
 	if (cache_file) {
 		cache_file.manifest_min_update = mani.min_update;
 	}
-	do_log(GF_LOG_DEBUG, `Service ${service.id} manifest ${ (updated ? 'updated' : 'received')} for ${target_url}`); // + ': ' + JSON.stringify(service.manifest));
+	do_log(GF_LOG_INFO, `Service ${service.id} manifest ${ (updated ? 'updated' : 'received')} for ${target_url}`); // + ': ' + JSON.stringify(service.manifest));
 }
 
 function locate_service(target_url)
@@ -547,7 +547,7 @@ function locate_service_quality(target_url, in_service)
 		}
 		period = null;
 	}
-	do_log(GF_LOG_DEBUG, `Located service ${service.id} for URL ${seg_name}${(rep ? (' rep: ' + rep.ID ) : '' )}`);
+	do_log(GF_LOG_INFO, `Located service ${service.id} for URL ${seg_name}${(rep ? (' rep: ' + rep.ID ) : '' )}`);
 	return [service, rep, period];
 }
 
@@ -564,10 +564,14 @@ globalThis.cat_buffer = cat_buffer;
 
 
 function get_mediaserver_stats(){
-	return all_services.reduce((r,s) => {
+	// all_services: only active services. when service unloads, stats are lost.
+	do_log(GF_LOG_INFO, `all_services: ${all_services}`);
+	const stats = all_services.reduce((r,s) => {
+		do_log(GF_LOG_INFO, `${s}`);
 		r[s.id] = s.stats;
 		return r;
 	}, {});
+	return stats
 }
 globalThis.get_mediaserver_stats = get_mediaserver_stats;
 
@@ -590,7 +594,7 @@ httpout.on_request = (req) =>
 		return;
 	}
 
-	do_log(GF_LOG_DEBUG, `Got request ${req.method} for ${req.url}`);
+	do_log(GF_LOG_INFO, `Got request ${req.method} for ${req.url}`);
 
 	if (req.url.startsWith('/stats')){
 		req.reply = 200;
@@ -714,7 +718,7 @@ httpout.on_request = (req) =>
 	//end of session
 	req.close = function(code) {
 		if (code<0)
-			do_log(GF_LOG_DEBUG, `Client session ${this.url} is closed: ${sys.error_string(code)}`);
+			do_log(GF_LOG_INFO, `Client session ${this.url} is closed: ${sys.error_string(code)}`);
 
 		let ridx = all_requests.indexOf(this);
 		if (ridx>=0) all_requests.splice(ridx, 1);
@@ -786,7 +790,7 @@ httpout.on_request = (req) =>
 
 		//MABR without origin server
 		if (this.service && !this.service.url && !this.service.mabr_repair_url) {
-			do_log(GF_LOG_DEBUG, `No URL for base repair, cannot fetch ${this.target_url}`);
+			do_log(GF_LOG_INFO, `No URL for base repair, cannot fetch ${this.target_url}`);
 			this.reply = 404;
 			this.send();
 			return;
@@ -846,7 +850,7 @@ httpout.on_request = (req) =>
 				let client_rate, req_time;
 				[client_rate, req_time] =  req.get_down_rate();
 				let buf_size = req.ab_total_bytes - req.bytes_in_req;
-				//do_log(GF_LOG_DEBUG, `Up rate ${evt.bps} bps - down rate ${client_rate} bps ${buf_size} queued bytes`);
+				//do_log(GF_LOG_INFO, `Up rate ${evt.bps} bps - down rate ${client_rate} bps ${buf_size} queued bytes`);
 				if (buf_size > 1000000) return 10000;
 				else if (buf_size > 200000) return client_rate;
 				return 0;
@@ -873,7 +877,7 @@ httpout.on_request = (req) =>
 
 		this.xhr.onreadystatechange = function() {
 			if (this.readyState == 4) {
-				do_log(GF_LOG_DEBUG, `${req.target_url} received`);
+				do_log(GF_LOG_INFO, `${req.target_url} received`);
 				if (req.manifest_type) {
 					update_manifest(req.manifest_ab, req.target_url, req.service, req.cache_file);
 					req.manifest_ab = null;
@@ -931,7 +935,7 @@ httpout.on_request = (req) =>
 					if (req.cache_file) req.cache_file.mime = h[1];
 				}
 			});
-			do_log(GF_LOG_DEBUG, `Sending reply to ${req.url} code ${req.xhr.status}`);
+			do_log(GF_LOG_INFO, `Sending reply to ${req.url} code ${req.xhr.status}`);
 			req.reply = req.xhr.status;
 			if (req.service && req.service.mabr) {
 				const val = req.live_edge ? 'no' : 'off-edge';
@@ -1047,7 +1051,7 @@ httpout.on_request = (req) =>
 			}
 		}
 
-		//local dir or custom JS
+		// local dir or custom JS
 		if (service_def && !service_def.http && !service_def.mabr) {
 			//custom JS handler
 			if (service_def.js_mod) {
@@ -1056,7 +1060,7 @@ httpout.on_request = (req) =>
 
 				if (!resolved) {
 					if (!req.reply) {
-						do_log(GF_LOG_DEBUG, `Invalid JS handler for ${req.url}`);
+						do_log(GF_LOG_INFO, `Invalid JS handler for ${req.url}`);
 						req.reply = 404;
 						req.send();
 					}
@@ -1096,7 +1100,7 @@ httpout.on_request = (req) =>
 				let e = service_def.sources.find( a => (a.name == my_url) );
 				if (!e) e = service_def.sources.find( a => my_url.startsWith(a.name) );
 				if (!e) {
-					do_log(GF_LOG_DEBUG, `Invalid service definition for ${req.url}`);
+					do_log(GF_LOG_INFO, `Invalid service definition for ${req.url}`);
 					req.reply = 404;
 					req.send();
 					return;
@@ -1114,7 +1118,7 @@ httpout.on_request = (req) =>
 						req.send();
 						return;
 					} else {
-						do_log(GF_LOG_DEBUG, `Invalid local path for ${req.url}`);
+						do_log(GF_LOG_INFO, `Invalid local path for ${req.url}`);
 						req.reply = 404;
 						req.send();
 						return;
@@ -1162,14 +1166,14 @@ httpout.on_request = (req) =>
 		req.target_url = (use_tls ? 'https://' : 'http://') + host + req.url;
 	}
 	if (! req.target_url) {
-		do_log(GF_LOG_DEBUG, `No service found for ${req.url}`);
+		do_log(GF_LOG_INFO, `No service found for ${req.url}`);
 		req.reply = 404;
 		req.send('No such service');
 		return;
 	}
 
 	do_log(GF_LOG_INFO, `Processing request ${req.method} for ${req.url}`);
-	do_log(GF_LOG_DEBUG, `Resolved request URL ${req.target_url}`);
+	do_log(GF_LOG_INFO, `Resolved request URL ${req.target_url}`);
 	let url_lwr = req.target_url.toLowerCase();
 	if (url_lwr.indexOf('.m3u8')>=0) req.manifest_type = MANI_HLS;
 	else if (url_lwr.indexOf('.mpd')>=0) req.manifest_type = MANI_DASH;
@@ -1357,7 +1361,7 @@ function create_service(http_url, force_mcast_activate, forced_sdesc)
 	}
 
 	if (serv_cfg) {
-		do_log(GF_LOG_DEBUG, `Service ${forced_sdesc ? forced_sdesc.local_base : http_url} has custom config${ (serv_cfg.mabr ? ' and MABR' : '')}`);
+		do_log(GF_LOG_INFO, `Service ${forced_sdesc ? forced_sdesc.local_base : http_url} has custom config${ (serv_cfg.mabr ? ' and MABR' : '')}`);
 		s.mabr = serv_cfg.mabr;
 		s.unload = serv_cfg.unload;
 		s.mabr_min_active = serv_cfg.activate;
@@ -1475,10 +1479,10 @@ function create_service(http_url, force_mcast_activate, forced_sdesc)
 			pending.waiting_mabr = 0;
 			pending.set_cache_file(file);
 			let ellapsed = pending.waiting_mabr_start ? (sys.clock_ms() - pending.waiting_mabr_start) : 0;
-			do_log(GF_LOG_DEBUG, `Found pending request (${url} ${pending.target_url}) for ${file.url}, canceling timeout (${ellapsed} ms since request)`);
+			do_log(GF_LOG_INFO, `Found pending request (${url} ${pending.target_url}) for ${file.url}, canceling timeout (${ellapsed} ms since request)`);
 			if (pid) pid.deactivate_timeout=0;
 		}
-		do_log(GF_LOG_DEBUG, `Start ${(cache_type==CACHE_TYPE_MABR) ? 'MABR ' : ''}reception of ${file.url} mime ${file.mime} - ${this.mem_cache.length} files in service cache`);
+		do_log(GF_LOG_INFO, `Start ${(cache_type==CACHE_TYPE_MABR) ? 'MABR ' : ''}reception of ${file.url} mime ${file.mime} - ${this.mem_cache.length} files in service cache`);
 		return file;
 	};
 
@@ -1504,7 +1508,7 @@ function create_service(http_url, force_mcast_activate, forced_sdesc)
 			if (same_conn.length) {
 				let rep_to = same_conn[same_conn.length-1];
 				rep_to.update();
-				do_log(GF_LOG_DEBUG, `Service ${this.id} same connection used for same quality ${rep.ID}, extending inactive timeout`);
+				do_log(GF_LOG_INFO, `Service ${this.id} same connection used for same quality ${rep.ID}, extending inactive timeout`);
 				use_same_conn = true;
 			}
 		}
@@ -1741,9 +1745,9 @@ function create_service(http_url, force_mcast_activate, forced_sdesc)
 				}
 			}
 
-			do_log(GF_LOG_DEBUG, `Service ${this.id} receiving MABR packet for ${pid.url} size ${pck.size} end ${pck.end}`);
+			do_log(GF_LOG_INFO, `Service ${this.id} receiving MABR packet for ${pid.url} size ${pck.size} end ${pck.end}`);
 
-			//reagregate packet
+			//rearegate packget
 			if (pck.size) {
 				if (file.data_tmp)
 					file.data_tmp = cat_buffer(file.data_tmp, pck.data);
@@ -1864,15 +1868,18 @@ function create_service(http_url, force_mcast_activate, forced_sdesc)
 			if (!force_deactivate) {
 				if (!req.waiting_mabr || (req.waiting_mabr>now)) continue;
 			}
+			do_log(GF_LOG_INFO, `force_deactivate: ${force_deactivate}`);
+			do_log(GF_LOG_INFO, `this.url: ${this.url}`);
+			do_log(GF_LOG_INFO, `this.mabr_repair_url: ${this.mabr_repair_url}`);
 			if (! this.url && !this.mabr_repair_url) {
-				do_log(GF_LOG_DEBUG, `MABR timeout for ${req.url} after ${now - req.waiting_mabr_start} ms`);
+				do_log(GF_LOG_INFO, `MABR timeout for ${req.url} after ${now - req.waiting_mabr_start} ms`);
 				this.pending_reqs.splice(i, 1);
 				i--;
 				req.reply = 404;
 				req.send();
 				continue;
 			}
-			do_log(GF_LOG_DEBUG, `MABR timeout for ${req.url} after ${now - req.waiting_mabr_start} ms - fetching from HTTP at ` + req.target_url);
+			do_log(GF_LOG_INFO, `MABR timeout for ${req.url} after ${now - req.waiting_mabr_start} ms - fetching from HTTP at ` + req.target_url);
 			this.pending_reqs.splice(this.pending_reqs.indexOf(req), 1);
 			i--;
 			if (req.activate_rep_timeout) {
@@ -1896,6 +1903,7 @@ function create_service(http_url, force_mcast_activate, forced_sdesc)
 	//and load if requested - we force mcast activation when an access to the mpd is first detected
 	if (force_mcast_activate && s.mabr)
 		s.load_mabr();
+		do_log(GF_LOG_INFO, `Service ID ${s.id} loaded MABR`);
 
 	s.stats = {
 		"X-From-MABR": {
@@ -1943,6 +1951,7 @@ function do_init()
 		do_log(GF_LOG_INFO, `Attached server running on port ${server_ports}`);
 	}
 	//preload services
+	do_log(GF_LOG_INFO, `Preload services`);
 	services_defs.forEach(sd => {
 		if (sd.unload) return;
 		if (sd.dyn_mabr) return;
@@ -1966,7 +1975,7 @@ function do_init()
 				if (!f.aborted && (f.received + s.purge_delay >= now)) continue;
 				s.mem_cache.splice(i, 1);
 				i--;
-				do_log(GF_LOG_DEBUG, `Removing ${f.url} from cache - remain ${s.mem_cache.length}`);
+				do_log(GF_LOG_INFO, `Removing ${f.url} from cache - remain ${s.mem_cache.length}`);
 			}
 
 			//check timeout on pending reqs waiting for MABR
@@ -1996,7 +2005,7 @@ function do_init()
 					if (s.keepalive)
 						s.unload_timeout = sys.clock_ms() + 1000*s.keepalive;
 				} else {
-					do_log(GF_LOG_DEBUG, `Service ${s.id} Rep ${active_rep.ID} is still active (active clients ${active_rep.nb_active})`);
+					do_log(GF_LOG_INFO, `Service ${s.id} Rep ${active_rep.ID} is still active (active clients ${active_rep.nb_active})`);
 				}
 				if (active_rep.mabr_active && s.mabr_min_active && (active_rep.nb_active<s.mabr_min_active) ) {
 					if (!mabr_canceled) {
