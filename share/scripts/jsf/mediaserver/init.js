@@ -568,7 +568,14 @@ function get_mediaserver_stats(){
 	do_log(GF_LOG_INFO, `all_services: ${all_services}`);
 	const stats = all_services.reduce((r,s) => {
 		do_log(GF_LOG_INFO, `${s}`);
-		r[s.id] = s.stats;
+		r[s.id] = {
+			"stats": s.stats,
+			"pending_reqs": s.pending_reqs.length,
+			"mabr_loaded": s.mabr_loaded,
+			"nb_mabr_active": s.nb_mabr_active,
+			"last_mabr_active": s.last_mabr_active,
+			"dyn_mabr": s.dyn_mabr
+		};
 		return r;
 	}, {});
 	return stats
